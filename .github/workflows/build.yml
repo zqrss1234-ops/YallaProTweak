@@ -14,7 +14,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          brew install ldid make xz dpkg 2>&1 || true
+          brew install ldid make xz 2>&1 || true
+          echo "HOMEBREW_NO_REQUIRE_TAP_TRUST=1" >> $GITHUB_ENV
 
       - name: Setup Theos
         run: |
@@ -30,33 +31,24 @@ jobs:
           tar -xf /tmp/sdk.tar.xz -C $HOME/theos/sdks
           ls -la $HOME/theos/sdks/
 
-      - name: Build & Package
+      - name: Build
         run: |
-          export THEOS=$HOME/theos
-          export PATH="$THEOS/bin:$PATH"
-          echo "--- FILES ---"
           ls -la
-          echo "--- MAKE ---"
-          make clean 2>&1
-          make 2>&1
-          mkdir -p output 2>&1
-          echo "--- FIND DYLIB ---"
-          find . -name "*.dylib" -type f 2>&1
-          find .theos -name "*.dylib" -exec cp {} output/YallaPro.dylib \; 2>&1 || true
-          find . -name "*.dylib" -exec cp {} output/ \; 2>&1 || true
-          echo "--- OUTPUT ---"
-          ls -la output/ 2>&1 || true
+          make clean 2>&1 || true
+          make 2>&1 || true
+          echo "--- looking for dylib ---"
+          find /Users -name "*.dylib" -path "*/YallaPro*" 2>/dev/null || true
+          find $HOME -name "*.dylib" -path "*/YallaPro*" 2>/dev/null || true
+          find . -name "*.dylib" 2>/dev/null || true
+          find .theos -type f 2>/dev/null || true
+          ls -la .theos/obj/debug/ 2>/dev/null || true
+          ls -la .theos/obj/ 2>/dev/null || true
 
-      - name: Upload .deb
-        if: always()
+      - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: YallaPro-Tweak-DEB
-          path: packages/*.deb
-
-      - name: Upload .dylib
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: YallaPro-Tweak-DYLIB
-          path: output/*.dylib
+          name: YallaPro-DYLIB
+          path: |
+            .theos/obj/debug/YallaPro.dylib
+            .theos/obj/YallaPro.dylib
+            **/*.dylib
