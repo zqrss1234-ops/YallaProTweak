@@ -12,43 +12,58 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: |
-          brew install ldid make xz 2>&1 || true
-          echo "HOMEBREW_NO_REQUIRE_TAP_TRUST=1" >> $GITHUB_ENV
+      - name: Install ldid
+        run: brew install ldid 2>&1 || true
 
-      - name: Setup Theos
+      - name: Compile dylib
         run: |
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
-          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-          echo "$HOME/theos/bin" >> $GITHUB_PATH
+          SDK=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk
+          xcrun -sdk iphoneos clang -arch arm64 \
+            -isysroot "$SDK" \
+            -miphoneos-version-min=14.0 \
+            -fobjc-arc \
+            -framework UIKit \
+            -framework CoreGraphics \
+            -framework QuartzCore \
+            -dynamiclib \
+            -undefined dynamic_lookup \
+            -o YallaPro.dylib \
+            Tweak.m 2>&1
 
-      - name: Download SDK
+      - name: Codesign dylib
         run: |
-          mkdir -p $HOME/theos/sdks
-          curl -L -o /tmp/sdk.tar.xz \
-            https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS16.5.sdk.tar.xz
-          tar -xf /tmp/sdk.tar.xz -C $HOME/theos/sdks
-          ls -la $HOME/theos/sdks/
+          ldid -S YallaPro.dylib 2>&1 || true
+          ls -la YallaPro.dylib 2>&1
 
-      - name: Build
+      - name: Create .deb
         run: |
-          ls -la
-          make clean 2>&1 || true
-          make 2>&1 || true
-          echo "--- looking for dylib ---"
-          find /Users -name "*.dylib" -path "*/YallaPro*" 2>/dev/null || true
-          find $HOME -name "*.dylib" -path "*/YallaPro*" 2>/dev/null || true
-          find . -name "*.dylib" 2>/dev/null || true
-          find .theos -type f 2>/dev/null || true
-          ls -la .theos/obj/debug/ 2>/dev/null || true
-          ls -la .theos/obj/ 2>/dev/null || true
+          mkdir -p package/DEBIAN
+          mkdir -p package/Library/MobileSubstrate/DynamicLibraries
+          cp YallaPro.dylib package/Library/MobileSubstrate/DynamicLibraries/
+          cp YallaPro.plist package/Library/MobileSubstrate/DynamicLibraries/
+          cat > package/DEBIAN/control << 'EOF'
+          Package: com.yallapro.tweak
+          Name: Yalla Pro
+          Version: 1.0.0
+          Architecture: iphoneos-arm
+          Description: Yalla Lite utility tool
+          Maintainer: Developer
+          Author: Developer
+          Section: Tweaks
+          Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 12.0)
+          EOF
+          chmod 755 package/DEBIAN/control
+          dpkg-deb -b package packages/YallaPro.deb 2>&1 || true
+          ls -la packages/ 2>&1 || true
 
-      - name: Upload dylib
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: YallaPro-DEB
+          path: packages/*.deb
+
+      - name: Upload .dylib
         uses: actions/upload-artifact@v4
         with:
           name: YallaPro-DYLIB
-          path: |
-            .theos/obj/debug/YallaPro.dylib
-            .theos/obj/YallaPro.dylib
-            **/*.dylib
+          path: YallaPro.dylib

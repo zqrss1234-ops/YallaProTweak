@@ -305,7 +305,7 @@ static void initGSEvent() {
     y += 44;
 
     UIView *srow = [[UIView alloc] initWithFrame:CGRectMake(pad, y, cw, 28)];
-    [self addSubview:srow];
+    [srow addSubview:self.speedLabel];
 
     self.speedLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 52, 28)];
     self.speedLabel.text = @"0.001";
@@ -322,6 +322,7 @@ static void initGSEvent() {
     self.slider.tintColor = [UIColor colorWithRed:0.5 green:0.3 blue:0.8 alpha:1];
     [self.slider addTarget:self action:@selector(onSlide:) forControlEvents:UIControlEventValueChanged];
     [srow addSubview:self.slider];
+    [self addSubview:srow];
     y += 34;
 
     self.merge = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -533,13 +534,13 @@ static void initGSEvent() {
 
 #pragma mark - Entry
 
-%ctor {
+__attribute__((constructor)) static void YallaProInit() {
     @autoreleasepool {
         dispatch_async(dispatch_get_main_queue(), ^{
             @try {
                 [[HBOverlay shared] show];
             } @catch (NSException *e) {
-                NSLog(@"YallaPro: %@", e);
+                NSLog(@"YallaProInit: %@", e);
             }
         });
     }

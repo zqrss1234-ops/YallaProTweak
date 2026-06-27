@@ -5,7 +5,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = YallaPro
 
-YallaPro_FILES = Tweak.xm
+YallaPro_FILES = Tweak.m
 YallaPro_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variable
 YallaPro_FRAMEWORKS = UIKit CoreGraphics QuartzCore
 YallaPro_LDFLAGS = -undefined dynamic_lookup
