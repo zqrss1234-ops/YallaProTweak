@@ -1,0 +1,9 @@
+*.deb
+*.ipa
+*.dSYM
+*.o
+*.d
+.theos/
+packages/
+build/
+.DS_Store

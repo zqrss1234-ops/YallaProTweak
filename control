@@ -1,0 +1,9 @@
+Package: com.yallapro.tweak
+Name: Yalla Pro
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Yalla Lite utility tool — auto-tap, position targeting, speed control & account merge
+Maintainer: Developer
+Author: Developer
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 12.0)
