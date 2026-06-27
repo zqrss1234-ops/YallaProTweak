@@ -6,10 +6,15 @@
 	<dict>
 		<key>Bundles</key>
 		<array>
-			<string>com.yalla.lite</string>
-			<string>com.yalla.lite.ios</string>
-			<string>com.yapp.yallalite</string>
-			<string>com.yallaapp.lite</string>
+			<string>com.yalla.yallalite</string>
+			<string>com.yalla.yallalite11</string>
+			<string>com.yalla.yallalite22</string>
+			<string>com.yalla.yallalite33</string>
+			<string>com.yalla.yallalite44</string>
+			<string>com.yalla.yallalite55</string>
+			<string>com.yalla.yallalite66</string>
+			<string>com.yalla.yallalite77</string>
+			<string>com.yalla.yallalite88</string>
 		</array>
 	</dict>
 </dict>
