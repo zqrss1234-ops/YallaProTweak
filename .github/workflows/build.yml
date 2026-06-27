@@ -18,17 +18,8 @@ jobs:
       - name: Compile dylib
         run: |
           SDK=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk
-          xcrun -sdk iphoneos clang -arch arm64 \
-            -isysroot "$SDK" \
-            -miphoneos-version-min=14.0 \
-            -fobjc-arc \
-            -framework UIKit \
-            -framework CoreGraphics \
-            -framework QuartzCore \
-            -dynamiclib \
-            -undefined dynamic_lookup \
-            -o YallaPro.dylib \
-            Tweak.m 2>&1
+          CFLAGS="-isysroot $SDK -miphoneos-version-min=14.0 -fobjc-arc -framework UIKit -framework CoreGraphics -framework QuartzCore -dynamiclib -undefined dynamic_lookup"
+          xcrun -sdk iphoneos clang -arch arm64 -arch arm64e $CFLAGS -o YallaPro.dylib Tweak.m 2>&1
 
       - name: Codesign dylib
         run: |
@@ -53,7 +44,9 @@ jobs:
           Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 12.0)
           EOF
           chmod 755 package/DEBIAN/control
-          dpkg-deb -b package packages/YallaPro.deb 2>&1 || true
+          (brew install dpkg 2>&1 || true)
+          export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
+          dpkg-deb -b package packages/YallaPro.deb 2>&1 || echo "dpkg-deb not available, skipping .deb"
           ls -la packages/ 2>&1 || true
 
       - name: Upload .deb
