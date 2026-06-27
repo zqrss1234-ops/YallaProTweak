@@ -171,13 +171,11 @@ static void initGSEvent(void) {
 @end
 @implementation HBPassthroughWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    for (UIView *v in self.subviews) {
-        if (!v.hidden && v.alpha > 0 &&
-            CGRectContainsPoint(v.frame, [self convertPoint:point toView:v])) {
-            return YES;
-        }
-    }
-    return NO;
+    UIView *root = self.rootViewController.view;
+    if (!root) return NO;
+    CGPoint pt = [self convertPoint:point toView:root];
+    UIView *hit = [root hitTest:pt withEvent:event];
+    return hit != nil && hit != root;
 }
 @end
 
