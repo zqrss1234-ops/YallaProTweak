@@ -21,13 +21,13 @@ static void initGSEvent(void) {
     });
 }
 
-#pragma mark - Auto-scrolling Marquee
+#pragma mark - Marquee
 
 @interface HBMarqueeView : UIView
 @property (nonatomic, strong) UILabel *label;
 @property (nonatomic, copy) NSString *text;
-- (void)startAnimating;
-- (void)stopAnimating;
+- (void)start;
+- (void)stop;
 @end
 
 @implementation HBMarqueeView
@@ -37,8 +37,8 @@ static void initGSEvent(void) {
     if (self) {
         self.clipsToBounds = YES;
         self.label = [[UILabel alloc] init];
-        self.label.font = [UIFont boldSystemFontOfSize:13];
-        self.label.textColor = [UIColor colorWithRed:1 green:0.8 blue:0.2 alpha:1];
+        self.label.font = [UIFont boldSystemFontOfSize:12];
+        self.label.textColor = [UIColor whiteColor];
         [self addSubview:self.label];
     }
     return self;
@@ -47,53 +47,51 @@ static void initGSEvent(void) {
 - (void)setText:(NSString *)text {
     _text = [text copy];
     self.label.text = text;
-    [self stopAnimating];
-    [self startAnimating];
+    [self stop];
+    [self start];
 }
 
-- (void)startAnimating {
+- (void)start {
     [self.label sizeToFit];
-    CGFloat labelW = self.label.frame.size.width;
-    CGFloat selfW = self.frame.size.width;
-    if (labelW <= selfW) {
-        self.label.frame = CGRectMake(0, 0, selfW, self.frame.size.height);
+    CGFloat lw = self.label.frame.size.width;
+    CGFloat sw = self.frame.size.width;
+    if (lw <= sw) {
+        self.label.frame = CGRectMake(0, 0, sw, self.frame.size.height);
         self.label.textAlignment = NSTextAlignmentCenter;
         return;
     }
     self.label.textAlignment = NSTextAlignmentLeft;
-    [self animateMarqueeWithWidth:labelW containerWidth:selfW];
+    [self animateWithWidth:lw container:sw];
 }
 
-- (void)animateMarqueeWithWidth:(CGFloat)labelW containerWidth:(CGFloat)selfW {
+- (void)animateWithWidth:(CGFloat)lw container:(CGFloat)sw {
     __weak typeof(self) ws = self;
     [self.label.layer removeAllAnimations];
-    self.label.frame = CGRectMake(selfW + 10, 0, labelW, self.frame.size.height);
-    CGFloat duration = labelW / 25.0;
-    [UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveLinear animations:^{
-        ws.label.frame = CGRectMake(-labelW - 10, 0, labelW, ws.frame.size.height);
-    } completion:^(BOOL finished) {
-        if (finished) {
-            [ws animateMarqueeWithWidth:labelW containerWidth:selfW];
-        }
+    self.label.frame = CGRectMake(sw + 8, 0, lw, self.frame.size.height);
+    CGFloat dur = lw / 28.0;
+    [UIView animateWithDuration:dur delay:0 options:UIViewAnimationOptionCurveLinear animations:^{
+        ws.label.frame = CGRectMake(-lw - 8, 0, lw, ws.frame.size.height);
+    } completion:^(BOOL fin) {
+        if (fin) [ws animateWithWidth:lw container:sw];
     }];
 }
 
-- (void)stopAnimating {
+- (void)stop {
     [self.label.layer removeAllAnimations];
 }
 
 @end
 
-#pragma mark - HBAutoTapEngine (interval-based)
+#pragma mark - AutoTapEngine
 
 @interface HBAutoTapEngine : NSObject
-@property (nonatomic, assign) CGPoint  tapPoint;
-@property (nonatomic, assign, readonly) BOOL    isRunning;
-@property (nonatomic, assign) CGFloat   delay; 
-@property (nonatomic, strong) NSTimer  *timer;
+@property (nonatomic, assign) CGPoint tapPoint;
+@property (nonatomic, assign, readonly) BOOL isRunning;
+@property (nonatomic, assign) CGFloat delay;
+@property (nonatomic, strong) NSTimer *timer;
 - (void)start;
 - (void)stop;
-- (void)setDelay:(CGFloat)delay;
+- (void)setDelayMs:(CGFloat)ms;
 @end
 
 @implementation HBAutoTapEngine
@@ -101,7 +99,7 @@ static void initGSEvent(void) {
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _delay     = 0.02;
+        _delay = 0.05;
         _isRunning = NO;
         initGSEvent();
     }
@@ -120,10 +118,11 @@ static void initGSEvent(void) {
     self.timer = nil;
 }
 
-- (void)setDelay:(CGFloat)delay {
-    if (delay < 0.001) delay = 0.001;
-    if (delay > 0.05) delay = 0.05;
-    _delay = delay;
+- (void)setDelayMs:(CGFloat)ms {
+    CGFloat sec = ms / 1000.0;
+    if (sec < 0.001) sec = 0.001;
+    if (sec > 0.5) sec = 0.5;
+    _delay = sec;
     if (self.isRunning) {
         [self.timer invalidate];
         [self scheduleTimer];
@@ -131,8 +130,7 @@ static void initGSEvent(void) {
 }
 
 - (void)scheduleTimer {
-    NSTimeInterval interval = self.delay;
-    self.timer = [NSTimer scheduledTimerWithTimeInterval:interval
+    self.timer = [NSTimer scheduledTimerWithTimeInterval:self.delay
                                                   target:self
                                                 selector:@selector(timerFired:)
                                                 userInfo:nil
@@ -146,13 +144,11 @@ static void initGSEvent(void) {
 
 - (void)simulateTapAtPoint:(CGPoint)point {
     if (!$GSEventCreateWithType || !$GSEventSetLocationInWindow || !$GSEventPostEvent) return;
-
     GSEventRef down = $GSEventCreateWithType(1007);
     if (down) {
         $GSEventSetLocationInWindow(down, point);
         $GSEventPostEvent(down);
     }
-
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.03 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
         GSEventRef up = $GSEventCreateWithType(1009);
@@ -169,11 +165,10 @@ static void initGSEvent(void) {
 
 @end
 
-#pragma mark - HBPassthroughWindow
+#pragma mark - PassthroughWindow
 
 @interface HBPassthroughWindow : UIWindow
 @end
-
 @implementation HBPassthroughWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
     for (UIView *v in self.subviews) {
@@ -186,10 +181,10 @@ static void initGSEvent(void) {
 }
 @end
 
-#pragma mark - Draggable Circle (tap position indicator)
+#pragma mark - Draggable Circle ("imps")
 
 @interface HBTapCircle : UIView
-@property (nonatomic, copy) void (^onPositionChanged)(CGPoint point);
+@property (nonatomic, copy) void (^onPositionChanged)(CGPoint);
 @property (nonatomic, assign) CGPoint dragOffset;
 @end
 
@@ -199,33 +194,31 @@ static void initGSEvent(void) {
     self = [super initWithFrame:frame];
     if (self) {
         CGFloat r = frame.size.width / 2;
-        self.layer.cornerRadius  = r;
-        self.layer.masksToBounds = NO;
-        self.backgroundColor = [UIColor clearColor];
         self.userInteractionEnabled = YES;
+        self.backgroundColor = [UIColor clearColor];
 
         UIView *inner = [[UIView alloc] initWithFrame:self.bounds];
-        inner.backgroundColor = [UIColor colorWithRed:1 green:0.2 blue:0.2 alpha:0.55];
+        inner.backgroundColor = [UIColor colorWithWhite:1 alpha:0.25];
         inner.layer.cornerRadius = r;
         inner.layer.borderColor = [UIColor whiteColor].CGColor;
-        inner.layer.borderWidth = 2.5;
+        inner.layer.borderWidth = 2;
         inner.userInteractionEnabled = NO;
         [self addSubview:inner];
 
-        UILabel *cross = [[UILabel alloc] initWithFrame:CGRectInset(self.bounds, 4, 4)];
-        cross.text = @"✚";
-        cross.font = [UIFont boldSystemFontOfSize:22];
-        cross.textColor = [UIColor whiteColor];
-        cross.textAlignment = NSTextAlignmentCenter;
-        cross.userInteractionEnabled = NO;
-        [self addSubview:cross];
+        UILabel *lbl = [[UILabel alloc] initWithFrame:self.bounds];
+        lbl.text = @"imps";
+        lbl.font = [UIFont boldSystemFontOfSize:11];
+        lbl.textColor = [UIColor whiteColor];
+        lbl.textAlignment = NSTextAlignmentCenter;
+        lbl.userInteractionEnabled = NO;
+        [self addSubview:lbl];
 
         UIBezierPath *sp = [UIBezierPath bezierPathWithOvalInRect:self.bounds];
-        self.layer.shadowColor   = [UIColor blackColor].CGColor;
-        self.layer.shadowOffset  = CGSizeMake(0, 3);
-        self.layer.shadowOpacity = 0.4;
-        self.layer.shadowRadius  = 5;
-        self.layer.shadowPath    = sp.CGPath;
+        self.layer.shadowColor = [UIColor blackColor].CGColor;
+        self.layer.shadowOffset = CGSizeMake(0, 3);
+        self.layer.shadowOpacity = 0.35;
+        self.layer.shadowRadius = 5;
+        self.layer.shadowPath = sp.CGPath;
     }
     return self;
 }
@@ -243,16 +236,14 @@ static void initGSEvent(void) {
     CGPoint c = CGPointMake(loc.x - self.dragOffset.x, loc.y - self.dragOffset.y);
     CGFloat h = self.frame.size.width / 2;
     CGRect sb = [UIScreen mainScreen].bounds;
-    c.x = MAX(h, MIN(sb.size.width  - h, c.x));
+    c.x = MAX(h, MIN(sb.size.width - h, c.x));
     c.y = MAX(h, MIN(sb.size.height - h, c.y));
     self.center = c;
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     self.transform = CGAffineTransformIdentity;
-    if (self.onPositionChanged) {
-        self.onPositionChanged(self.center);
-    }
+    if (self.onPositionChanged) self.onPositionChanged(self.center);
 }
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
@@ -261,160 +252,153 @@ static void initGSEvent(void) {
 
 @end
 
-#pragma mark - HBCollapsiblePanel
+#pragma mark - Panel (dark purple, new layout)
 
-@interface HBCollapsiblePanel : UIView
-@property (nonatomic, assign) BOOL  isCollapsed;
-@property (nonatomic, assign) BOOL  isRunning;
+@interface HBPanel : UIView
+@property (nonatomic, assign) BOOL isCollapsed;
+@property (nonatomic, assign) BOOL isRunning;
+@property (nonatomic, strong) UIView   *arrowBar;
+@property (nonatomic, strong) UILabel  *arrowLabel;
+@property (nonatomic, strong) HBMarqueeView *marquee;
 @property (nonatomic, strong) UIButton *toggleBtn;
 @property (nonatomic, strong) UISlider *speedSlider;
 @property (nonatomic, strong) UILabel  *speedLabel;
 @property (nonatomic, strong) UIButton *mergeBtn;
 @property (nonatomic, strong) UIButton *hideBtn;
-@property (nonatomic, strong) UILabel  *arrowLabel;
-@property (nonatomic, strong) HBMarqueeView *topMarquee;
-@property (nonatomic, strong) HBMarqueeView *bottomMarquee;
 @property (nonatomic, assign) CGRect fullFrame;
-@property (nonatomic, assign) CGRect collapsedFrame;
-
-@property (nonatomic, copy) void (^onToggle)(BOOL running);
-@property (nonatomic, copy) void (^onSpeedChange)(CGFloat delay);
+@property (nonatomic, assign) CGRect collFrame;
+@property (nonatomic, copy) void (^onToggle)(BOOL);
+@property (nonatomic, copy) void (^onSpeedChange)(CGFloat);
 @property (nonatomic, copy) void (^onMerge)(void);
 @end
 
-@implementation HBCollapsiblePanel
+@implementation HBPanel
 
-- (instancetype)initWithFullFrame:(CGRect)fullFrame {
-    CGFloat collW = 56;
-    CGFloat collH = 48;
-    CGFloat collX = fullFrame.origin.x + (fullFrame.size.width - collW) / 2;
-    CGFloat collY = fullFrame.origin.y + fullFrame.size.height + 10;
-    CGRect cf = CGRectMake(collX, collY, collW, collH);
-
-    self = [super initWithFrame:fullFrame];
+- (instancetype)initWithFullFrame:(CGRect)ff {
+    CGFloat barH = 30;
+    CGFloat x = ff.origin.x;
+    CGFloat y = ff.origin.y;
+    CGFloat w = ff.size.width;
+    CGRect cf = CGRectMake(x, y, w, barH);
+    self = [super initWithFrame:ff];
     if (self) {
-        _fullFrame = fullFrame;
-        _collapsedFrame = cf;
+        _fullFrame = ff;
+        _collFrame = cf;
         _isCollapsed = NO;
         _isRunning = NO;
-        [self setupPanel];
+        [self setup];
     }
     return self;
 }
 
-- (void)setupPanel {
-    self.backgroundColor = [UIColor colorWithWhite:0.08 alpha:0.94];
-    self.layer.cornerRadius = 14;
+- (void)setup {
+    self.backgroundColor = [UIColor colorWithRed:0.06 green:0.025 blue:0.10 alpha:0.95];
+    self.layer.cornerRadius = 12;
     self.clipsToBounds = YES;
-    self.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:0.3].CGColor;
+    self.layer.borderColor = [UIColor colorWithWhite:0.3 alpha:0.25].CGColor;
     self.layer.borderWidth = 1;
 
     CGFloat W = self.frame.size.width;
-    CGFloat padX = 12;
-    CGFloat cW = W - padX * 2;
+    CGFloat pad = 10;
+    CGFloat cw = W - pad * 2;
 
-    self.topMarquee = [[HBMarqueeView alloc] initWithFrame:CGRectMake(0, 0, W, 22)];
-    self.topMarquee.backgroundColor = [UIColor colorWithWhite:0.15 alpha:0.5];
-    [self addSubview:self.topMarquee];
+    self.arrowBar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, W, 30)];
+    self.arrowBar.backgroundColor = [UIColor colorWithRed:0.09 green:0.04 blue:0.15 alpha:0.5];
+    self.arrowBar.userInteractionEnabled = YES;
+    [self addSubview:self.arrowBar];
 
-    CGFloat y = 30;
-
-    self.toggleBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.toggleBtn.frame = CGRectMake(padX, y, cW, 46);
-    self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.55 blue:0.2 alpha:0.8];
-    self.toggleBtn.layer.cornerRadius = 10;
-    [self.toggleBtn setTitle:@"تشغيل" forState:UIControlStateNormal];
-    [self.toggleBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.toggleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:18];
-    [self.toggleBtn addTarget:self action:@selector(toggleTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self addSubview:self.toggleBtn];
-    y += 54;
-
-    UIView *spdRow = [[UIView alloc] initWithFrame:CGRectMake(padX, y, cW, 36)];
-    [self addSubview:spdRow];
-
-    self.speedLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 55, 36)];
-    self.speedLabel.text = @"0.020s";
-    self.speedLabel.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightMedium];
-    self.speedLabel.textColor = [UIColor whiteColor];
-    self.speedLabel.textAlignment = NSTextAlignmentCenter;
-    [spdRow addSubview:self.speedLabel];
-
-    self.speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(60, 3, cW - 60, 30)];
-    self.speedSlider.minimumValue = 0.0;
-    self.speedSlider.maximumValue = 0.05;
-    self.speedSlider.value = 0.02;
-    self.speedSlider.continuous = YES;
-    self.speedSlider.tintColor = [UIColor colorWithRed:0.2 green:0.5 blue:1.0 alpha:1];
-    [self.speedSlider addTarget:self action:@selector(speedChanged:) forControlEvents:UIControlEventValueChanged];
-    [spdRow addSubview:self.speedSlider];
-
-    y += 44;
-
-    self.mergeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.mergeBtn.frame = CGRectMake(padX, y, cW, 38);
-    self.mergeBtn.backgroundColor = [UIColor colorWithRed:0.55 green:0.2 blue:0.75 alpha:0.6];
-    self.mergeBtn.layer.cornerRadius = 10;
-    [self.mergeBtn setTitle:@"🔗 دمج الحسابات" forState:UIControlStateNormal];
-    [self.mergeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.mergeBtn.titleLabel.font = [UIFont systemFontOfSize:14];
-    [self.mergeBtn addTarget:self action:@selector(mergeTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self addSubview:self.mergeBtn];
-    y += 44;
-
-    self.hideBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.hideBtn.frame = CGRectMake(padX, y, cW, 36);
-    self.hideBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:0.5];
-    self.hideBtn.layer.cornerRadius = 10;
-    [self.hideBtn setTitle:@"◀ اخفاء" forState:UIControlStateNormal];
-    [self.hideBtn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
-    self.hideBtn.titleLabel.font = [UIFont systemFontOfSize:13];
-    [self.hideBtn addTarget:self action:@selector(hideTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self addSubview:self.hideBtn];
-
-    CGFloat bmY = self.frame.size.height - 22;
-    self.bottomMarquee = [[HBMarqueeView alloc] initWithFrame:CGRectMake(0, bmY, W, 22)];
-    self.bottomMarquee.backgroundColor = [UIColor colorWithWhite:0.15 alpha:0.5];
-    [self addSubview:self.bottomMarquee];
-
-    NSString *names = @"عبدالإله لحلوح شارو ابومتعب سعيد حاتم الكايد الهباس الشمامره";
-    self.topMarquee.text = names;
-    self.bottomMarquee.text = names;
-
-    self.arrowLabel = [[UILabel alloc] initWithFrame:self.bounds];
-    self.arrowLabel.text = @"▶";
-    self.arrowLabel.font = [UIFont boldSystemFontOfSize:22];
+    self.arrowLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 40, 30)];
+    self.arrowLabel.text = @"▼";
+    self.arrowLabel.font = [UIFont systemFontOfSize:14];
     self.arrowLabel.textColor = [UIColor whiteColor];
     self.arrowLabel.textAlignment = NSTextAlignmentCenter;
-    self.arrowLabel.backgroundColor = [UIColor colorWithWhite:0.08 alpha:0.94];
-    self.arrowLabel.hidden = YES;
-    self.arrowLabel.userInteractionEnabled = YES;
-    self.arrowLabel.layer.cornerRadius = 12;
-    self.arrowLabel.clipsToBounds = YES;
-    [self addSubview:self.arrowLabel];
+    self.arrowLabel.center = CGPointMake(W/2, 15);
+    [self.arrowBar addSubview:self.arrowLabel];
 
-    UITapGestureRecognizer *arrowTap = [[UITapGestureRecognizer alloc] initWithTarget:self
-                                                                               action:@selector(expandTapped)];
-    [self.arrowLabel addGestureRecognizer:arrowTap];
+    UITapGestureRecognizer *at = [[UITapGestureRecognizer alloc] initWithTarget:self
+                                                                        action:@selector(arrowTapped)];
+    [self.arrowBar addGestureRecognizer:at];
+
+    CGFloat y = 32;
+
+    self.marquee = [[HBMarqueeView alloc] initWithFrame:CGRectMake(0, y, W, 20)];
+    self.marquee.backgroundColor = [UIColor colorWithRed:0.09 green:0.04 blue:0.15 alpha:0.4];
+    [self addSubview:self.marquee];
+    NSString *names = @"عبدالإله لحلوح شارو ابومتعب سعيد حاتم الكايد الهباس الشمامره";
+    self.marquee.text = names;
+    y += 24;
+
+    self.toggleBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.toggleBtn.frame = CGRectMake(pad, y, cw, 40);
+    self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.5 blue:0.25 alpha:0.8];
+    self.toggleBtn.layer.cornerRadius = 8;
+    [self.toggleBtn setTitle:@"تفعيل" forState:UIControlStateNormal];
+    [self.toggleBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.toggleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    [self.toggleBtn addTarget:self action:@selector(toggleTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self addSubview:self.toggleBtn];
+    y += 46;
+
+    UIView *sRow = [[UIView alloc] initWithFrame:CGRectMake(pad, y, cw, 32)];
+    [self addSubview:sRow];
+
+    self.speedLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 50, 32)];
+    self.speedLabel.text = @"50ms";
+    self.speedLabel.font = [UIFont monospacedDigitSystemFontOfSize:12 weight:UIFontWeightMedium];
+    self.speedLabel.textColor = [UIColor whiteColor];
+    self.speedLabel.textAlignment = NSTextAlignmentCenter;
+    [sRow addSubview:self.speedLabel];
+
+    self.speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(54, 1, cw - 54, 30)];
+    self.speedSlider.minimumValue = 1;
+    self.speedSlider.maximumValue = 100;
+    self.speedSlider.value = 50;
+    self.speedSlider.continuous = YES;
+    self.speedSlider.tintColor = [UIColor colorWithRed:0.5 green:0.3 blue:0.8 alpha:1];
+    [self.speedSlider addTarget:self action:@selector(speedChanged:) forControlEvents:UIControlEventValueChanged];
+    [sRow addSubview:self.speedSlider];
+
+    y += 38;
+
+    self.mergeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.mergeBtn.frame = CGRectMake(pad, y, cw, 34);
+    self.mergeBtn.backgroundColor = [UIColor colorWithRed:0.5 green:0.2 blue:0.7 alpha:0.55];
+    self.mergeBtn.layer.cornerRadius = 8;
+    [self.mergeBtn setTitle:@"ربط جميع yallalite" forState:UIControlStateNormal];
+    [self.mergeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.mergeBtn.titleLabel.font = [UIFont systemFontOfSize:13];
+    [self.mergeBtn addTarget:self action:@selector(mergeTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self addSubview:self.mergeBtn];
+    y += 40;
+
+    self.hideBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.hideBtn.frame = CGRectMake(pad, y, cw, 30);
+    self.hideBtn.backgroundColor = [UIColor colorWithWhite:0.15 alpha:0.4];
+    self.hideBtn.layer.cornerRadius = 8;
+    [self.hideBtn setTitle:@"اخفاء القائمة" forState:UIControlStateNormal];
+    [self.hideBtn setTitleColor:[UIColor colorWithWhite:0.7 alpha:1] forState:UIControlStateNormal];
+    self.hideBtn.titleLabel.font = [UIFont systemFontOfSize:12];
+    [self.hideBtn addTarget:self action:@selector(hideTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self addSubview:self.hideBtn];
 }
 
 - (void)toggleTapped {
     self.isRunning = !self.isRunning;
     if (self.isRunning) {
         [self.toggleBtn setTitle:@"إيقاف" forState:UIControlStateNormal];
-        self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.7 green:0.15 blue:0.15 alpha:0.8];
+        self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.65 green:0.15 blue:0.15 alpha:0.8];
     } else {
-        [self.toggleBtn setTitle:@"تشغيل" forState:UIControlStateNormal];
-        self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.55 blue:0.2 alpha:0.8];
+        [self.toggleBtn setTitle:@"تفعيل" forState:UIControlStateNormal];
+        self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.5 blue:0.25 alpha:0.8];
     }
     if (self.onToggle) self.onToggle(self.isRunning);
 }
 
-- (void)speedChanged:(UISlider *)slider {
-    CGFloat val = roundf(slider.value * 1000.0) / 1000.0;
-    if (val < 0.001) val = 0.001;
-    self.speedLabel.text = [NSString stringWithFormat:@"%.3fs", val];
-    if (self.onSpeedChange) self.onSpeedChange(val);
+- (void)speedChanged:(UISlider *)sl {
+    NSInteger val = (NSInteger)roundf(sl.value);
+    if (val < 1) val = 1;
+    self.speedLabel.text = [NSString stringWithFormat:@"%ldms", (long)val];
+    if (self.onSpeedChange) self.onSpeedChange((CGFloat)val);
 }
 
 - (void)mergeTapped {
@@ -424,202 +408,161 @@ static void initGSEvent(void) {
 }
 
 - (void)hideTapped {
-    [self collapsePanel];
+    [self collapse];
 }
 
-- (void)expandTapped {
-    [self expandPanel];
+- (void)arrowTapped {
+    if (self.isCollapsed) {
+        [self expand];
+    } else {
+        [self collapse];
+    }
 }
 
-- (void)collapsePanel {
+- (void)collapse {
     self.isCollapsed = YES;
-    self.arrowLabel.hidden = NO;
-    self.arrowLabel.alpha = 0;
-    self.arrowLabel.frame = self.bounds;
-    self.arrowLabel.layer.cornerRadius = self.layer.cornerRadius;
-    self.arrowLabel.clipsToBounds = YES;
-
-    [UIView animateWithDuration:0.35 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.5 options:UIViewAnimationOptionCurveEaseInOut animations:^{
-        self.frame = self.collapsedFrame;
-        self.arrowLabel.frame = self.bounds;
-        self.arrowLabel.alpha = 1;
-        self.topMarquee.alpha = 0;
+    [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0.5 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+        self.frame = self.collFrame;
+        self.marquee.alpha = 0;
         self.toggleBtn.alpha = 0;
         self.speedLabel.alpha = 0;
         self.speedSlider.alpha = 0;
         self.mergeBtn.alpha = 0;
         self.hideBtn.alpha = 0;
-        self.bottomMarquee.alpha = 0;
     } completion:^(BOOL fin) {
-        self.topMarquee.hidden = YES;
+        self.marquee.hidden = YES;
         self.toggleBtn.hidden = YES;
         self.speedLabel.hidden = YES;
         self.speedSlider.hidden = YES;
         self.mergeBtn.hidden = YES;
         self.hideBtn.hidden = YES;
-        self.bottomMarquee.hidden = YES;
     }];
 }
 
-- (void)expandPanel {
+- (void)expand {
     self.isCollapsed = NO;
-    self.topMarquee.hidden = NO;
+    self.marquee.hidden = NO;
     self.toggleBtn.hidden = NO;
     self.speedLabel.hidden = NO;
     self.speedSlider.hidden = NO;
     self.mergeBtn.hidden = NO;
     self.hideBtn.hidden = NO;
-    self.bottomMarquee.hidden = NO;
-    self.topMarquee.alpha = 0;
+    self.marquee.alpha = 0;
     self.toggleBtn.alpha = 0;
     self.speedLabel.alpha = 0;
     self.speedSlider.alpha = 0;
     self.mergeBtn.alpha = 0;
     self.hideBtn.alpha = 0;
-    self.bottomMarquee.alpha = 0;
 
-    [UIView animateWithDuration:0.35 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.5 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+    [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0.5 options:UIViewAnimationOptionCurveEaseInOut animations:^{
         self.frame = self.fullFrame;
-        self.arrowLabel.alpha = 0;
-        self.topMarquee.alpha = 1;
+        self.marquee.alpha = 1;
         self.toggleBtn.alpha = 1;
         self.speedLabel.alpha = 1;
         self.speedSlider.alpha = 1;
         self.mergeBtn.alpha = 1;
         self.hideBtn.alpha = 1;
-        self.bottomMarquee.alpha = 1;
-    } completion:^(BOOL fin) {
-        self.arrowLabel.hidden = YES;
-    }];
+    } completion:nil];
 }
 
-- (void)enableMergeButton {
+- (void)enableMerge {
     self.mergeBtn.enabled = YES;
-    [self.mergeBtn setTitle:@"🔗 دمج الحسابات" forState:UIControlStateNormal];
-}
-
-- (void)setRunning:(BOOL)running {
-    _isRunning = running;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (running) {
-            [self.toggleBtn setTitle:@"إيقاف" forState:UIControlStateNormal];
-            self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.7 green:0.15 blue:0.15 alpha:0.8];
-        } else {
-            [self.toggleBtn setTitle:@"تشغيل" forState:UIControlStateNormal];
-            self.toggleBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.55 blue:0.2 alpha:0.8];
-        }
-    });
+    [self.mergeBtn setTitle:@"ربط جميع yallalite" forState:UIControlStateNormal];
 }
 
 @end
 
-#pragma mark - HBOverlayManager
+#pragma mark - OverlayManager
 
 @interface HBOverlayManager : NSObject
-@property (nonatomic, strong) HBPassthroughWindow *overlayWindow;
-@property (nonatomic, strong) HBTapCircle        *tapCircle;
-@property (nonatomic, strong) HBCollapsiblePanel *panel;
-@property (nonatomic, strong) HBAutoTapEngine    *tapEngine;
-@property (nonatomic, assign) CGPoint tapPosition;
-- (void)show;
+@property (nonatomic, strong) HBPassthroughWindow *window;
+@property (nonatomic, strong) HBTapCircle *circle;
+@property (nonatomic, strong) HBPanel *panel;
+@property (nonatomic, strong) HBAutoTapEngine *engine;
 @end
 
 @implementation HBOverlayManager
 
 + (instancetype)shared {
-    static HBOverlayManager *instance = nil;
-    static dispatch_once_t token;
-    dispatch_once(&token, ^{
-        instance = [[self alloc] init];
-    });
-    return instance;
-}
-
-- (instancetype)init {
-    self = [super init];
-    if (self) {
-        CGSize sz = [UIScreen mainScreen].bounds.size;
-        _tapPosition = CGPointMake(sz.width / 2, sz.height / 2);
-    }
-    return self;
+    static HBOverlayManager *inst;
+    static dispatch_once_t tok;
+    dispatch_once(&tok, ^{ inst = [[self alloc] init]; });
+    return inst;
 }
 
 - (void)show {
-    if (self.overlayWindow) return;
+    if (self.window) return;
     CGRect sb = [UIScreen mainScreen].bounds;
 
-    self.overlayWindow = [[HBPassthroughWindow alloc] initWithFrame:sb];
-    self.overlayWindow.windowLevel = 2000;
-    self.overlayWindow.backgroundColor = [UIColor clearColor];
-    self.overlayWindow.userInteractionEnabled = YES;
-    self.overlayWindow.hidden = NO;
+    self.window = [[HBPassthroughWindow alloc] initWithFrame:sb];
+    self.window.windowLevel = 2000;
+    self.window.backgroundColor = [UIColor clearColor];
+    self.window.hidden = NO;
 
     UIViewController *vc = [[UIViewController alloc] init];
     vc.view.backgroundColor = [UIColor clearColor];
-    vc.view.userInteractionEnabled = YES;
-    self.overlayWindow.rootViewController = vc;
+    self.window.rootViewController = vc;
 
-    CGFloat pw = 210;
-    CGFloat ph = 270;
+    CGFloat pw = 186;
+    CGFloat ph = 232;
     CGFloat px = (sb.size.width - pw) / 2;
-    CGFloat py = (sb.size.height - ph) / 2;
-    self.panel = [[HBCollapsiblePanel alloc] initWithFullFrame:CGRectMake(px, py, pw, ph)];
+    CGFloat py = (sb.size.height - ph) / 2 - 20;
+    self.panel = [[HBPanel alloc] initWithFullFrame:CGRectMake(px, py, pw, ph)];
     [vc.view addSubview:self.panel];
 
-    CGFloat circleSize = 42;
-    CGFloat cx = sb.size.width - circleSize - 16;
-    CGFloat cy = sb.size.height / 2 - circleSize / 2;
-    self.tapCircle = [[HBTapCircle alloc] initWithFrame:CGRectMake(cx, cy, circleSize, circleSize)];
-    [vc.view addSubview:self.tapCircle];
-    [vc.view bringSubviewToFront:self.tapCircle];
+    CGFloat cs = 44;
+    CGFloat cx = sb.size.width - cs - 14;
+    CGFloat cy = sb.size.height / 2 - cs / 2;
+    self.circle = [[HBTapCircle alloc] initWithFrame:CGRectMake(cx, cy, cs, cs)];
+    [vc.view addSubview:self.circle];
+    [vc.view bringSubviewToFront:self.circle];
 
-    self.tapEngine = [[HBAutoTapEngine alloc] init];
-    self.tapEngine.tapPoint = self.tapCircle.center;
+    self.engine = [[HBAutoTapEngine alloc] init];
+    self.engine.tapPoint = self.circle.center;
 
     __weak typeof(self) ws = self;
 
-    self.tapCircle.onPositionChanged = ^(CGPoint pt) {
-        ws.tapPosition = pt;
-        ws.tapEngine.tapPoint = pt;
+    self.circle.onPositionChanged = ^(CGPoint pt) {
+        ws.engine.tapPoint = pt;
     };
 
     self.panel.onToggle = ^(BOOL running) {
         if (running) {
-            ws.tapEngine.tapPoint = ws.tapCircle.center;
-            [ws.tapEngine setDelay:ws.panel.speedSlider.value > 0.001 ? ws.panel.speedSlider.value : 0.001];
-            [ws.tapEngine start];
+            ws.engine.tapPoint = ws.circle.center;
+            [ws.engine setDelayMs:ws.panel.speedSlider.value];
+            [ws.engine start];
         } else {
-            [ws.tapEngine stop];
+            [ws.engine stop];
         }
     };
 
-    self.panel.onSpeedChange = ^(CGFloat delay) {
-        [ws.tapEngine setDelay:delay];
+    self.panel.onSpeedChange = ^(CGFloat ms) {
+        [ws.engine setDelayMs:ms];
     };
 
     self.panel.onMerge = ^{
-        [ws performMerge];
+        [ws doMerge];
     };
 }
 
-- (void)performMerge {
+- (void)doMerge {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        UIAlertController *alert = [UIAlertController
-            alertControllerWithTitle:@"دمج الحسابات"
-                             message:@"✅ تم دمج جميع الحسابات بنجاح"
+        UIAlertController *a = [UIAlertController
+            alertControllerWithTitle:@"ربط الحسابات"
+                             message:@"✅ تم ربط جميع حسابات yallalite بنجاح"
                       preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"تم" style:UIAlertActionStyleDefault
-                                                handler:^(UIAlertAction *a) {
-            [self.panel enableMergeButton];
+        [a addAction:[UIAlertAction actionWithTitle:@"تم" style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *_) {
+            [self.panel enableMerge];
         }]];
-        [self.overlayWindow.rootViewController presentViewController:alert animated:YES completion:nil];
+        [self.window.rootViewController presentViewController:a animated:YES completion:nil];
     });
 }
 
 @end
 
-#pragma mark - Entry Point (%ctor + dispatch_async)
+#pragma mark - Entry Point
 
 %ctor {
     @autoreleasepool {
@@ -627,7 +570,7 @@ static void initGSEvent(void) {
             @try {
                 [[HBOverlayManager shared] show];
             } @catch (NSException *e) {
-                NSLog(@"YallaPro: init error - %@", e);
+                NSLog(@"YallaPro: %@", e);
             }
         });
     }
