@@ -34,8 +34,15 @@ jobs:
         run: |
           export THEOS=$HOME/theos
           export PATH="$THEOS/bin:$PATH"
-          make clean 2>&1
-          make 2>&1
+          echo "--- PWD ---"
+          pwd
+          echo "--- FILES ---"
+          ls -la
+          echo "--- MAKE CLEAN ---"
+          make clean 2>&1 | tee /tmp/clean.log
+          echo "--- MAKE ---"
+          make 2>&1 | tee /tmp/build.log
+          echo "--- BUILD LOG END ---"
 
       - name: Package
         run: |
@@ -56,3 +63,10 @@ jobs:
         with:
           name: YallaPro-Tweak-DYLIB
           path: output/YallaPro.dylib
+
+      - name: Upload Build Logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: /tmp/*.log
