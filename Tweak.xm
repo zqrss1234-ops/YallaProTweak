@@ -177,10 +177,9 @@ static void initGSEvent(void) {
 @implementation HBPassthroughWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
     for (UIView *v in self.subviews) {
-        if (v.userInteractionEnabled && !v.hidden && v.alpha > 0 &&
+        if (!v.hidden && v.alpha > 0 &&
             CGRectContainsPoint(v.frame, [self convertPoint:point toView:v])) {
-            UIView *hit = [v hitTest:[v convertPoint:point fromView:self] withEvent:event];
-            if (hit && hit != v) return YES;
+            return YES;
         }
     }
     return NO;
@@ -620,14 +619,16 @@ static void initGSEvent(void) {
 
 @end
 
-#pragma mark - Entry Point
+#pragma mark - Entry Point (%ctor + dispatch_async)
 
-%hook UIViewController
-- (void)viewDidLoad {
-    %orig;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        [[HBOverlayManager shared] show];
-    });
+%ctor {
+    @autoreleasepool {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            @try {
+                [[HBOverlayManager shared] show];
+            } @catch (NSException *e) {
+                NSLog(@"YallaPro: init error - %@", e);
+            }
+        });
+    }
 }
-%end
