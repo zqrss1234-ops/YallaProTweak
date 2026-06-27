@@ -22,19 +22,19 @@ jobs:
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      - name: Use System SDK
+      - name: Download SDK
         run: |
           mkdir -p $HOME/theos/sdks
-          ln -sf /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk $HOME/theos/sdks/iPhoneOS16.4.sdk
-          echo "Available SDKs:"
+          curl -L -o $HOME/sdk.tar.xz https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS16.5.sdk.tar.xz
+          tar -xf $HOME/sdk.tar.xz -C $HOME/theos/sdks
           ls -la $HOME/theos/sdks/
 
       - name: Build Package
         run: |
-          make clean
-          make package
-          mkdir -p output
-          find .theos -name "*.dylib" -exec cp {} output/YallaPro.dylib \;
+          make clean 2>&1
+          make package 2>&1
+          mkdir -p output 2>&1
+          find .theos -name "*.dylib" -exec cp {} output/YallaPro.dylib \; 2>&1
 
       - name: Upload .deb Artifact
         uses: actions/upload-artifact@v4
