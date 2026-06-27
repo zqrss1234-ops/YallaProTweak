@@ -14,35 +14,44 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          brew install ldid make xz
-          brew install libplist
+          brew install ldid make xz dpkg 2>&1 || true
 
       - name: Setup Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
 
       - name: Download SDK
         run: |
           mkdir -p $HOME/theos/sdks
-          curl -L -o $HOME/sdk.tar.xz https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS16.5.sdk.tar.xz
-          tar -xf $HOME/sdk.tar.xz -C $HOME/theos/sdks
+          curl -L -o /tmp/sdk.tar.xz \
+            https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS16.5.sdk.tar.xz
+          tar -xf /tmp/sdk.tar.xz -C $HOME/theos/sdks
           ls -la $HOME/theos/sdks/
 
-      - name: Build Package
+      - name: Build
         run: |
+          export THEOS=$HOME/theos
+          export PATH="$THEOS/bin:$PATH"
           make clean 2>&1
+          make 2>&1
+
+      - name: Package
+        run: |
+          export THEOS=$HOME/theos
+          export PATH="$THEOS/bin:$PATH"
           make package 2>&1
           mkdir -p output 2>&1
           find .theos -name "*.dylib" -exec cp {} output/YallaPro.dylib \; 2>&1
 
-      - name: Upload .deb Artifact
+      - name: Upload .deb
         uses: actions/upload-artifact@v4
         with:
           name: YallaPro-Tweak-DEB
           path: packages/*.deb
 
-      - name: Upload .dylib Artifact
+      - name: Upload .dylib
         uses: actions/upload-artifact@v4
         with:
           name: YallaPro-Tweak-DYLIB
